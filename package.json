@@ -1,0 +1,30 @@
+{
+  "name": "kino",
+  "version": "1.0.0",
+  "description": "Cinema application backend - Node.js + Express API",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "nodemon server/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/y3rb4byt3/KINO-js.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/y3rb4byt3/KINO-js/issues"
+  },
+  "homepage": "https://github.com/y3rb4byt3/KINO-js#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  }
+}

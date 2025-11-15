@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "email": "test@example.com",
+    "password": "password123",
+    "firstName": "Jan",
+    "lastName": "Kowalski",
+    "createdAt": "2025-11-01T10:00:00Z"
+  },
+  {
+    "id": 2,
+    "email": "admin@kino.pl",
+    "password": "admin123",
+    "firstName": "Admin",
+    "lastName": "Kino",
+    "createdAt": "2025-10-15T08:30:00Z"
+  }
+]

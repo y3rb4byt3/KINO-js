@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "userId": 1,
+    "showtimeId": 2,
+    "seats": [
+      "A1",
+      "A2"
+    ],
+    "totalPrice": 60,
+    "status": "confirmed",
+    "createdAt": "2025-11-13T14:20:00Z"
+  },
+  {
+    "id": 2,
+    "userId": 1,
+    "showtimeId": 5,
+    "seats": [
+      "D5",
+      "D6"
+    ],
+    "totalPrice": 60,
+    "status": "confirmed",
+    "createdAt": "2025-11-13T15:45:00Z"
+  },
+  {
+    "id": 3,
+    "userId": 1,
+    "showtimeId": 1,
+    "seats": [
+      "E5",
+      "E6"
+    ],
+    "totalPrice": 50,
+    "status": "confirmed",
+    "createdAt": "2025-11-14T14:11:07.542Z"
+  }
+]
