@@ -28,15 +28,13 @@
     "date": "2025-11-14",
     "time": "17:30",
     "hall": 1,
-    "availableSeats": 88,
+    "availableSeats": 90,
     "totalSeats": 100,
     "price": 30,
     "seatsLayout": {
       "rows": 10,
       "seatsPerRow": 10,
       "occupiedSeats": [
-        "A1",
-        "A2",
         "A3",
         "B1",
         "B2",
@@ -210,13 +208,16 @@
     "date": "2025-11-15",
     "time": "13:00",
     "hall": 1,
-    "availableSeats": 100,
+    "availableSeats": 98,
     "totalSeats": 100,
     "price": 25,
     "seatsLayout": {
       "rows": 10,
       "seatsPerRow": 10,
-      "occupiedSeats": []
+      "occupiedSeats": [
+        "F5",
+        "F6"
+      ]
     }
   },
   {
