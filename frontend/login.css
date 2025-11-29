@@ -85,14 +85,14 @@ main {
     background-color: #f9f9f9;
 }
 
-.login-form input[type="text"],
-.login-form input[type="password"] {
+.login-form input {
     width: 100%;
     padding: 10px;
     margin: 10px 0;
     border: 1px solid #ccc;
     box-sizing: border-box;
 }
+
 .login-form input[type="submit"] {
     width: 100%;
     padding: 10px;
