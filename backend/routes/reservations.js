@@ -1,173 +1,134 @@
 const express = require('express');
 const router = express.Router();
-const fs = require('fs').promises;
-const path = require('path');
+const Reservation = require('../models/Reservation');
+const Showtime = require('../models/Showtime');
+const User = require('../models/User');
 
-const RESERVATIONS_FILE = path.join(__dirname, '../data/reservations.json');
-const SHOWTIMES_FILE = path.join(__dirname, '../data/showtimes.json');
-const USERS_FILE = path.join(__dirname, '../data/users.json');
-
-async function getReservations() {
-  const data = await fs.readFile(RESERVATIONS_FILE, 'utf8');
-  return JSON.parse(data);
-}
-
-async function saveReservations(reservations) {
-  await fs.writeFile(RESERVATIONS_FILE, JSON.stringify(reservations, null, 2));
-}
-
-async function getShowtimes() {
-  const data = await fs.readFile(SHOWTIMES_FILE, 'utf8');
-  return JSON.parse(data);
-}
-
-async function saveShowtimes(showtimes) {
-  await fs.writeFile(SHOWTIMES_FILE, JSON.stringify(showtimes, null, 2));
-}
-
-async function getUsers() {
-  const data = await fs.readFile(USERS_FILE, 'utf8');
-  return JSON.parse(data);
-}
-
+// GET - Pobierz rezerwacje (wszystkie lub dla konkretnego usera)
 router.get('/', async (req, res) => {
   try {
-    const reservations = await getReservations();
     const { userId } = req.query;
+    let options = {};
 
     if (userId) {
-      const userReservations = reservations.filter(r => r.userId === parseInt(userId));
-      return res.json(userReservations);
+      options.where = { userId: userId };
     }
 
+    const reservations = await Reservation.findAll(options);
     res.json(reservations);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch reservations', message: error.message });
+    res.status(500).json({ error: 'Nie udało się pobrać rezerwacji', message: error.message });
   }
 });
 
+// GET - Pojedyncza rezerwacja
 router.get('/:id', async (req, res) => {
   try {
-    const reservations = await getReservations();
-    const reservation = reservations.find(r => r.id === parseInt(req.params.id));
-
+    const reservation = await Reservation.findByPk(req.params.id);
     if (!reservation) {
-      return res.status(404).json({ error: 'Reservation not found' });
+      return res.status(404).json({ error: 'Rezerwacja nie znaleziona' });
     }
-
     res.json(reservation);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch reservation', message: error.message });
+    res.status(500).json({ error: 'Błąd serwera', message: error.message });
   }
 });
 
+// POST - Utwórz nową rezerwację
 router.post('/', async (req, res) => {
   try {
     const { userId, showtimeId, seats } = req.body;
 
+    // 1. Walidacja danych wejściowych
     if (!userId || !showtimeId || !seats || !Array.isArray(seats) || seats.length === 0) {
-      return res.status(400).json({
-        error: 'Invalid request',
-        required: {
-          userId: 'number',
-          showtimeId: 'number',
-          seats: 'array of seat codes (e.g., ["A1", "A2"])'
-        }
-      });
+      return res.status(400).json({ error: 'Nieprawidłowe dane. Wymagane: userId, showtimeId, seats (tablica).' });
     }
 
-    const users = await getUsers();
-    if (!users.find(u => u.id === userId)) {
-      return res.status(404).json({ error: 'User not found' });
+    // 2. Sprawdzenie czy user istnieje
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Użytkownik nie istnieje' });
     }
 
-    const showtimes = await getShowtimes();
-    const showtime = showtimes.find(st => st.id === showtimeId);
-
+    // 3. Sprawdzenie czy seans istnieje
+    const showtime = await Showtime.findByPk(showtimeId);
     if (!showtime) {
-      return res.status(404).json({ error: 'Showtime not found' });
+      return res.status(404).json({ error: 'Seans nie istnieje' });
     }
 
-    const occupiedSeats = showtime.seatsLayout.occupiedSeats;
-    const unavailableSeats = seats.filter(seat => occupiedSeats.includes(seat));
-
-    if (unavailableSeats.length > 0) {
-      return res.status(409).json({
-        error: 'Some seats are not available',
-        unavailableSeats
-      });
-    }
-
+    // 4. Walidacja formatu miejsc (A1-J10)
     const seatRegex = /^[A-J]([1-9]|10)$/;
     const invalidSeats = seats.filter(seat => !seatRegex.test(seat));
-
     if (invalidSeats.length > 0) {
-      return res.status(400).json({
-        error: 'Invalid seat format',
-        invalidSeats,
-        format: 'Seats should be in format A1-J10'
-      });
+      return res.status(400).json({ error: 'Nieprawidłowy numer miejsca', invalidSeats });
     }
 
-    const reservations = await getReservations();
-    const newReservation = {
-      id: reservations.length > 0 ? Math.max(...reservations.map(r => r.id)) + 1 : 1,
+    // 5. Sprawdzenie dostępności miejsc
+    // Dzięki getterom w modelu, seatsLayout jest obiektem JS, a occupiedSeats tablicą
+    let currentLayout = showtime.seatsLayout; 
+    const occupiedSeats = currentLayout.occupiedSeats;
+
+    const unavailableSeats = seats.filter(seat => occupiedSeats.includes(seat));
+    if (unavailableSeats.length > 0) {
+      return res.status(409).json({ error: 'Wybrane miejsca są już zajęte', unavailableSeats });
+    }
+
+    // 6. Tworzenie rezerwacji w bazie
+    const newReservation = await Reservation.create({
       userId,
       showtimeId,
       seats,
-      totalPrice: seats.length * showtime.price,
-      status: 'confirmed',
-      createdAt: new Date().toISOString()
-    };
+      totalPrice: seats.length * showtime.price
+    });
 
-    reservations.push(newReservation);
-    await saveReservations(reservations);
-
-    showtime.seatsLayout.occupiedSeats.push(...seats);
-    showtime.availableSeats -= seats.length;
-
-    await saveShowtimes(showtimes);
+    // 7. Aktualizacja zajętych miejsc w Seansie
+    // Musimy sklonować layout, zmodyfikować go i przypisać ponownie, aby Sequelize wykrył zmianę
+    const updatedLayout = { ...currentLayout };
+    updatedLayout.occupiedSeats.push(...seats);
+    
+    showtime.seatsLayout = updatedLayout; // To wywoła setter w modelu (zamiana na JSON string)
+    await showtime.save();
 
     res.status(201).json({
-      message: 'Reservation created successfully',
+      message: 'Rezerwacja utworzona pomyślnie',
       reservation: newReservation
     });
+
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create reservation', message: error.message });
+    console.error(error);
+    res.status(500).json({ error: 'Błąd podczas tworzenia rezerwacji', message: error.message });
   }
 });
 
+// DELETE - Anulowanie rezerwacji
 router.delete('/:id', async (req, res) => {
   try {
-    const reservations = await getReservations();
-    const reservationIndex = reservations.findIndex(r => r.id === parseInt(req.params.id));
-
-    if (reservationIndex === -1) {
-      return res.status(404).json({ error: 'Reservation not found' });
+    const reservation = await Reservation.findByPk(req.params.id);
+    if (!reservation) {
+      return res.status(404).json({ error: 'Rezerwacja nie znaleziona' });
     }
 
-    const reservation = reservations[reservationIndex];
-
-    const showtimes = await getShowtimes();
-    const showtime = showtimes.find(st => st.id === reservation.showtimeId);
-
+    // Znajdź seans, żeby zwolnić miejsca
+    const showtime = await Showtime.findByPk(reservation.showtimeId);
     if (showtime) {
-      showtime.seatsLayout.occupiedSeats = showtime.seatsLayout.occupiedSeats.filter(
+      let currentLayout = showtime.seatsLayout;
+      
+      // Usuwamy miejsca z listy zajętych
+      currentLayout.occupiedSeats = currentLayout.occupiedSeats.filter(
         seat => !reservation.seats.includes(seat)
       );
-      showtime.availableSeats += reservation.seats.length;
-      await saveShowtimes(showtimes);
+
+      // Aktualizujemy seans (musimy przypisać cały obiekt layoutu na nowo)
+      showtime.seatsLayout = { ...currentLayout };
+      await showtime.save();
     }
 
-    reservations.splice(reservationIndex, 1);
-    await saveReservations(reservations);
+    // Usuwamy rezerwację
+    await reservation.destroy();
 
-    res.json({
-      message: 'Reservation cancelled successfully',
-      reservation
-    });
+    res.json({ message: 'Rezerwacja anulowana pomyślnie' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to cancel reservation', message: error.message });
+    res.status(500).json({ error: 'Błąd podczas anulowania', message: error.message });
   }
 });
 
