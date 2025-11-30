@@ -34,17 +34,19 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    // Szukamy w bazie
     const user = await User.findOne({ where: { email } });
 
-    // Sprawdzamy hasło (proste porównanie tekstowe na potrzeby projektu)
     if (!user || user.password !== password) {
       return res.status(401).json({ error: 'Błędny email lub hasło' });
     }
 
-    const userResponse = user.toJSON();
-    delete userResponse.password;
+    // Backend zwraca teraz rolę (user/admin)
+    const userResponse = {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        role: user.role // <--- To jest kluczowe
+    };
 
     res.json({
       message: 'Zalogowano pomyślnie',
