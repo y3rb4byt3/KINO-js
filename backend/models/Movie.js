@@ -15,15 +15,15 @@ const Movie = sequelize.define('Movie', {
         allowNull: false
     },
     genre: {
-        type: DataTypes.STRING, // SQLite nie ma typu ARRAY, więc zapiszemy to jako tekst (np. "Sci-Fi,Action")
+        type: DataTypes.STRING, 
         allowNull: false,
         get() {
-            // Magia: przy odczycie zamieniamy tekst na tablicę
+            
             const rawValue = this.getDataValue('genre');
             return rawValue ? rawValue.split(',') : [];
         },
         set(val) {
-            // Magia: przy zapisie zamieniamy tablicę na tekst
+            
             this.setDataValue('genre', Array.isArray(val) ? val.join(',') : val);
         }
     },

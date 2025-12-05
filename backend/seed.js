@@ -12,7 +12,7 @@ const usersData = [
         lastName: "Admin",
         email: "admin@kino.pl",
         password: "admin", // Hasło admina
-        role: "admin"      // <--- KLUCZOWE: Rola administratora
+        role: "admin"      
     },
     {
         firstName: "Jan",
