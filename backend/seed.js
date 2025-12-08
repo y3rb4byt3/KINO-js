@@ -31,7 +31,8 @@ const moviesData = [
         genre: ["Sci-Fi", "Adventure"],
         director: "Denis Villeneuve",
         posterUrl: "https://image.tmdb.org/t/p/w500/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg",
-        releaseDate: "2024-03-01"
+        releaseDate: "2024-03-01",
+        trailerUrl: "https://www.youtube.com/watch?v=Way9Dexny3w" // <--- NOWE
     },
     {
         title: "Oppenheimer",
@@ -40,7 +41,8 @@ const moviesData = [
         genre: ["Biography", "Drama", "History"],
         director: "Christopher Nolan",
         posterUrl: "https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg",
-        releaseDate: "2023-07-21"
+        releaseDate: "2023-07-21",
+        trailerUrl: "https://www.youtube.com/watch?v=uYPbbksJxIg" // <--- NOWE
     },
     {
         title: "The Batman",
@@ -49,7 +51,8 @@ const moviesData = [
         genre: ["Action", "Crime", "Drama"],
         director: "Matt Reeves",
         posterUrl: "https://image.tmdb.org/t/p/w500/74xTEgt7R36Fpooo50r9T25onhq.jpg",
-        releaseDate: "2022-03-04"
+        releaseDate: "2022-03-04",
+        trailerUrl: "https://www.youtube.com/watch?v=mqqft2x_Aa4" // <--- NOWE
     },
     {
         title: "Barbie",
@@ -58,7 +61,8 @@ const moviesData = [
         genre: ["Comedy", "Adventure", "Fantasy"],
         director: "Greta Gerwig",
         posterUrl: "https://image.tmdb.org/t/p/w500/iuFNMS8U5cb6xfzi51Dbkovj7vM.jpg",
-        releaseDate: "2023-07-21"
+        releaseDate: "2023-07-21",
+        trailerUrl: "https://www.youtube.com/watch?v=pBk4NYhWNMM" // <--- NOWE
     },
     {
         title: "Killers of the Flower Moon",
@@ -67,7 +71,8 @@ const moviesData = [
         genre: ["Crime", "Drama", "History"],
         director: "Martin Scorsese",
         posterUrl: "https://image.tmdb.org/t/p/w500/dB6Krk806zeqd0YNp2ngQ9zXteH.jpg",
-        releaseDate: "2023-10-20"
+        releaseDate: "2023-10-20",
+        trailerUrl: "https://www.youtube.com/watch?v=EP34Yoxs3FQ" // <--- NOWE
     }
 ];
 

@@ -77,3 +77,67 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* --- MODAL TRAILER (Youtube) --- */
+
+/* Ciemne tło na cały ekran */
+.modal-overlay {
+    display: flex;
+    position: fixed;
+    z-index: 1000; /* Zawsze na wierzchu */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.85); /* 85% czerni */
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.3s;
+}
+
+/* Pudełko na film */
+.modal-content {
+    position: relative;
+    width: 80%;
+    max-width: 900px;
+    background: #000;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+
+/* Przycisk zamknięcia (X) */
+.close-button {
+    position: absolute;
+    top: -35px;
+    right: 0;
+    color: #fff;
+    font-size: 30px;
+    cursor: pointer;
+    font-weight: bold;
+}
+.close-button:hover {
+    color: #ccc;
+}
+
+/* Kontener utrzymujący proporcje 16:9 dla YouTube */
+.video-container {
+    position: relative;
+    padding-bottom: 56.25%; /* 16:9 */
+    height: 0;
+    overflow: hidden;
+}
+
+.video-container iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}

@@ -35,6 +35,10 @@ const Movie = sequelize.define('Movie', {
         type: DataTypes.STRING,
         defaultValue: ''
     },
+    trailerUrl: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
     releaseDate: {
         type: DataTypes.STRING,
         allowNull: true

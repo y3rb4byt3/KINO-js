@@ -81,7 +81,7 @@ const submitReservation = async () => {
 
         if (res.ok) {
             // SUKCES: Używamy notify zamiast alert
-            notify('Bilety zostały zarezerwowane! Dziękujemy.', 'success')
+            notify('Miejsce zarezerwowane! Dziękujemy.', 'success')
             router.push('/')
         } else {
             // BŁĄD BACKENDU:

@@ -1,102 +1,133 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed, watch, inject } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 
+// Konfiguracja
 const API_URL = 'http://localhost:3000/api'
-const movies = ref([])
 const router = useRouter()
+const route = useRoute()
+const notify = inject('notify') // Wstrzykujemy system powiadomień (Toast)
+
+// Stan aplikacji
+const movies = ref([])
 const user = ref(JSON.parse(localStorage.getItem('user')))
 
-// Filtry
+// Stan filtrów
 const searchQuery = ref('')
-const selectedGenre = ref('Wszystkie gatunki')
-const sortOption = ref('Sortuj według')
+const selectedGenre = ref('all')
+const sortOption = ref('default')
 
-// Stan Modala Trailera
+// Stan Modala (Trailer)
 const showModal = ref(false)
 const trailerUrl = ref('')
 
+// Sprawdzanie czy user jest adminem
 const isAdmin = computed(() => user.value && user.value.role === 'admin')
 
-// --- Pobieranie filmów ---
+// --- 1. POBIERANIE FILMÓW ---
 const loadMovies = async () => {
   try {
-    const response = await fetch(`${API_URL}/movies`)
-    const data = await response.json()
-    // Poprawka gatunków (array vs string)
-    movies.value = data.map(m => {
-      let mainGenre = 'other'
-      if (Array.isArray(m.genre) && m.genre.length > 0) mainGenre = m.genre[0]
-      else if (typeof m.genre === 'string') mainGenre = m.genre.split(',')[0]
-      
-      return {
+    const res = await fetch(`${API_URL}/movies`)
+    const data = await res.json()
+    
+    // Normalizacja danych (backend czasem zwraca string, czasem tablicę gatunków)
+    movies.value = data.map(m => ({
         ...m,
-        mainGenre: mainGenre.toLowerCase(),
-        displayGenre: Array.isArray(m.genre) ? m.genre.join(', ') : m.genre
-      }
-    })
-  } catch (error) {
-    console.error('Błąd pobierania filmów', error)
+        // Tworzymy tablicę gatunków do filtrowania
+        genreList: Array.isArray(m.genre) ? m.genre : (m.genre || '').split(','),
+        // Wyciągamy główny gatunek
+        mainGenre: (Array.isArray(m.genre) ? m.genre[0] : m.genre).toLowerCase()
+    }))
+  } catch (e) { 
+    notify('Błąd pobierania filmów', 'error')
+    console.error(e)
   }
 }
 
-// --- Filtrowanie i Sortowanie (Computed) ---
+// --- 2. FILTROWANIE I SORTOWANIE (Computed) ---
 const filteredMovies = computed(() => {
-  let result = movies.value
+    let result = movies.value
 
-  // Szukanie
-  if (searchQuery.value) {
-    result = result.filter(m => m.title.toLowerCase().includes(searchQuery.value.toLowerCase()))
-  }
-  // Gatunek
-  if (selectedGenre.value !== 'Wszystkie gatunki') {
-    result = result.filter(m => m.mainGenre.includes(selectedGenre.value.toLowerCase()))
-  }
-  // Sortowanie
-  if (sortOption.value === 'newest') {
-    result = [...result].sort((a, b) => new Date(b.releaseDate) - new Date(a.releaseDate))
-  } else if (sortOption.value === 'oldest') {
-    result = [...result].sort((a, b) => new Date(a.releaseDate) - new Date(b.releaseDate))
-  }
-  
-  return result
+    // Wyszukiwanie po tytule
+    if (searchQuery.value) {
+        result = result.filter(m => m.title.toLowerCase().includes(searchQuery.value.toLowerCase()))
+    }
+    
+    // Filtrowanie po gatunku
+    if (selectedGenre.value !== 'all') {
+        result = result.filter(m => 
+            m.genreList.some(g => g.toLowerCase().includes(selectedGenre.value))
+        )
+    }
+
+    // Sortowanie po dacie premiery
+    if (sortOption.value === 'newest') {
+        result = [...result].sort((a,b) => new Date(b.releaseDate) - new Date(a.releaseDate))
+    } else if (sortOption.value === 'oldest') {
+        result = [...result].sort((a,b) => new Date(a.releaseDate) - new Date(b.releaseDate))
+    }
+    
+    return result
 })
 
-// --- Akcje ---
+// Obserwowanie zmian w URL (np. kliknięcie w nawigacji "Filmy -> Akcja")
+watch(() => route.query.genre, (newGenre) => {
+    if (newGenre) selectedGenre.value = newGenre
+})
+
+// --- 3. AKCJE UŻYTKOWNIKA ---
+
+// Otwieranie Trailera
+const openTrailer = (url) => {
+    if (!url) {
+        notify('Ten film nie ma trailera.', 'error')
+        return
+    }
+    // Zamiana linku na wersję embed
+    let embed = url.replace('watch?v=', 'embed/')
+    if (url.includes('youtu.be/')) {
+        embed = url.replace('youtu.be/', 'www.youtube.com/embed/')
+    }
+
+    trailerUrl.value = embed
+    showModal.value = true
+}
+
+// Kupno biletu
+const buyTicket = (movie) => {
+    localStorage.setItem('selectedMovieId', movie.id)
+    localStorage.setItem('selectedMovieTitle', movie.title)
+    router.push('/reservation')
+}
+
+// Przejście do komentarzy
+const goToComments = (title) => {
+    localStorage.setItem('commentMovieTitle', title)
+    router.push('/comments')
+}
+
+// Usuwanie filmu (ADMIN)
 const deleteMovie = async (id) => {
-    // Confirm systemowy zostawiamy, bo to zabezpieczenie przed przypadkowym klikiem.
-    // Ale komunikat o sukcesie/błędzie zmieniamy na Toast.
-    if(!confirm("Czy na pewno chcesz usunąć ten film?")) return
+    if(!confirm("Czy na pewno chcesz trwale usunąć ten film?")) return
     
     try {
-        await fetch(`${API_URL}/movies/${id}`, { method: 'DELETE' })
-        loadMovies()
-        notify('Film został usunięty.', 'success') // <--- NOWE
+        const res = await fetch(`${API_URL}/movies/${id}`, { method: 'DELETE' })
+        if (res.ok) {
+            loadMovies() // Odśwież listę
+            notify('Film został usunięty.', 'success')
+        } else {
+            notify('Nie udało się usunąć filmu.', 'error')
+        }
     } catch(e) { 
-        notify('Nie udało się usunąć filmu.', 'error') // <--- NOWE
+        notify('Błąd połączenia z serwerem.', 'error') 
     }
 }
 
-const buyTicket = (movie) => {
-  localStorage.setItem('selectedMovieId', movie.id)
-  localStorage.setItem('selectedMovieTitle', movie.title)
-  router.push('/reservation')
-}
-
-const openTrailer = (url) => {
-  if (!url) return alert('Brak trailera')
-  let embed = url
-  if (url.includes('watch?v=')) embed = url.replace('watch?v=', 'embed/')
-  trailerUrl.value = embed
-  showModal.value = true
-}
-
+// Inicjalizacja przy wejściu na stronę
 onMounted(() => {
-  loadMovies()
-  // Odśwież usera w razie przelogowania
-  window.addEventListener('login-success', () => {
-      user.value = JSON.parse(localStorage.getItem('user'))
-  })
+    loadMovies()
+    // Jeśli wchodzimy z linku np. /?genre=action, ustawiamy filtr
+    if (route.query.genre) selectedGenre.value = route.query.genre
 })
 </script>
 
@@ -104,57 +135,88 @@ onMounted(() => {
   <div class="container">
     <div class="sidebar"></div>
     <main>
-      <h2>Repertuar</h2>
-      
-      <input v-model="searchQuery" type="text" placeholder="Szukaj filmów..." style="width: 100%; margin-bottom: 10px; padding: 5px;">
-      
-      <select v-model="selectedGenre" style="width: 100%; margin-bottom: 10px; padding: 5px;">
-        <option>Wszystkie gatunki</option>
-        <option value="sci-fi">Sci-Fi</option>
-        <option value="action">Akcja</option>
-        <option value="drama">Dramat</option>
-        <option value="comedy">Komedia</option>
-      </select>
-
-      <select v-model="sortOption" style="width: 100%; margin-bottom: 10px; padding: 5px;">
-        <option>Sortuj według</option>
-        <option value="newest">Najnowsze</option>
-        <option value="oldest">Najstarsze</option>
-      </select>
-
-      <div id="movies">
-        <div v-for="movie in filteredMovies" :key="movie.id" class="movie">
-          <img :src="movie.posterUrl" :alt="movie.title">
-          <div class="movie-details">
-            <h3>{{ movie.title }}</h3>
-            <p>{{ movie.description }}</p>
-            <p><strong>Reżyser:</strong> {{ movie.director }}</p>
-            <p><strong>Gatunek:</strong> {{ movie.displayGenre }}</p>
-            <p><strong>Czas:</strong> {{ movie.duration }} min</p>
+        <h2>Repertuar</h2>
+        
+        <div id="search">
+            <input v-model="searchQuery" type="text" placeholder="Szukaj filmów..." class="filter-input">
             
-            <div class="movie-buttons">
-              <button @click="buyTicket(movie)">Kup Bilet</button>
-              <button @click="openTrailer(movie.trailerUrl)">Trailer</button>
-              <button v-if="isAdmin" class="delete-btn" @click="deleteMovie(movie.id)">Usuń</button>
-            </div>
-          </div>
+            <select v-model="selectedGenre" class="filter-select">
+                <option value="all">Wszystkie gatunki</option>
+                <option value="action">Akcja</option>
+                <option value="comedy">Komedia</option>
+                <option value="drama">Dramat</option>
+                <option value="sci-fi">Sci-Fi</option>
+                <option value="biography">Biografia</option>
+            </select>
+            
+            <select v-model="sortOption" class="filter-select">
+                <option value="default">Domyślne sortowanie</option>
+                <option value="newest">Najnowsze premiery</option>
+                <option value="oldest">Najstarsze premiery</option>
+            </select>
         </div>
-        <p v-if="filteredMovies.length === 0">Nie znaleziono filmów.</p>
-      </div>
+
+        <div v-if="filteredMovies.length === 0" style="text-align:center; margin-top:20px;">
+            Nie znaleziono filmów spełniających kryteria.
+        </div>
+
+        <div v-for="movie in filteredMovies" :key="movie.id" class="movie">
+            <img :src="movie.posterUrl || 'https://via.placeholder.com/150'" :alt="movie.title">
+            
+            <div class="movie-details">
+                <h3>{{ movie.title }}</h3>
+                <p>{{ movie.description }}</p>
+                <p><strong>Reżyser:</strong> {{ movie.director }}</p>
+                <p><strong>Gatunek:</strong> {{ movie.genreList.join(', ') }}</p>
+                <p><strong>Czas trwania:</strong> {{ movie.duration }} min</p>
+                
+                <div class="movie-buttons">
+                    <button @click="buyTicket(movie)">Kup Bilet</button>
+                    <button @click="openTrailer(movie.trailerUrl)">Trailer</button>
+                    <button @click="goToComments(movie.title)">Opinie</button>
+                    
+                    <button v-if="isAdmin" class="delete-btn" @click="deleteMovie(movie.id)">Usuń</button>
+                </div>
+            </div>
+        </div>
     </main>
     <div class="sidebar"></div>
 
     <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
-      <div class="modal-content">
-        <span class="close-button" @click="showModal = false">&times;</span>
-        <div style="position: relative; padding-bottom: 56.25%; height: 0;">
-           <iframe 
-             :src="trailerUrl + '?autoplay=1'" 
-             style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;"
-             allowfullscreen>
-           </iframe>
+        <div class="modal-content">
+            <span class="close-button" @click="showModal = false">&times;</span>
+            <div class="video-container">
+                <iframe 
+                    :src="trailerUrl + '?autoplay=1'" 
+                    allow="autoplay; encrypted-media" 
+                    allowfullscreen>
+                </iframe>
+            </div>
         </div>
-      </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Lokalne style dla filtrów, żeby wyglądały ładnie */
+#search {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.filter-input, .filter-select {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    flex: 1; /* Rozciągnij na dostępną szerokość */
+    min-width: 150px;
+}
+
+/* Style przycisków wewnątrz karty filmu */
+.movie-buttons button {
+    margin-right: 5px;
+    margin-top: 5px;
+}
+</style>
