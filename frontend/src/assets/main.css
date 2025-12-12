@@ -1,225 +1,284 @@
-/* src/assets/main.css */
-
-/* --- RESET I BAZA --- */
-body, html {
+/* =========================================
+   1. RESET I BAZA (CIEMNY MOTYW)
+   ========================================= */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0;
     padding: 0;
-    height: 100%;
-    font-family: Arial, sans-serif;
+    background-color: #020617; /* Slate 950 - bardzo ciemny granat */
+    color: #e2e8f0;            /* Jasny szary tekst */
 }
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* =========================================
+   2. UKŁAD STRONY (LAYOUT)
+   ========================================= */
 .wrapper {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
 }
 
-/* --- HEADER & FOOTER --- */
-header, footer {
-    background-color: #333;
-    color: #fff;
-    text-align: center;
-    padding: 10px 0;
-}
-header h1 { margin: 0; }
-nav ul {
-    list-style: none;
-    padding: 0;
-    display: flex;
-    justify-content: center;
-    gap: 20px;
-}
-nav ul li { position: relative; }
-nav ul li a { color: white; text-decoration: none; }
-
-/* Dropdown menu */
-.dropdown-content {
-    display: none;
-    position: absolute;
-    background-color: #333;
-    min-width: 160px;
-    z-index: 100;
-    left: 0;
-}
-.dropdown-content a {
-    padding: 12px 16px;
-    text-align: left;
-    display: block;
-}
-.dropdown-content a:hover { background-color: #575757; }
-li:hover .dropdown-content { display: block; }
-
-/* --- LAYOUT --- */
 .container {
-    display: grid;
-    grid-template-columns: 1fr 3fr 1fr;
-    gap: 20px;
+    display: flex;
     flex: 1;
-    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
 }
-.sidebar { background-color: #f4f4f4; }
-main {
-    background-color: #fff;
-    padding: 20px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-}
-footer { margin-top: auto; }
 
-/* --- FILMY (HOME) --- */
+main {
+    flex: 3;
+    padding: 20px;
+}
+
+.sidebar {
+    flex: 1;
+    display: none; /* Na telefonach ukrywamy */
+}
+
+@media (min-width: 800px) {
+    .sidebar { display: block; }
+}
+
+/* =========================================
+   3. NAGŁÓWEK (HEADER)
+   ========================================= */
+header {
+    display: flex;
+    align-items: center;
+    /* Brak gap tutaj, odstępami steruje nav */
+    
+    height: 60px;
+    padding: 0 40px;
+    
+    background: linear-gradient(to right, #1e293b, #0f172a); /* Ciemny gradient */
+    color: white;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+/* LOGO KINA - KONTENER */
+header h1 {
+    margin: 0;
+    line-height: 0;      /* Usuwa zbędne odstępy pod SVG */
+    flex-shrink: 0;
+    display: flex;       /* Żeby link i SVG były wycentrowane */
+    align-items: center;
+}
+
+header h1 a {
+    display: flex;       /* Ważne: usuwa podkreślenia i ustawia SVG */
+    align-items: center;
+}
+
+/* =========================================
+   4. NAWIGACJA (MENU)
+   ========================================= */
+nav {
+    flex: 1;            /* Zajmuje całą wolną przestrzeń na prawo od logo */
+    margin-left: 40px;  /* Odstęp od napisu "Kino XYZ" */
+    display: flex;      /* Pozwala kontrolować szerokość UL */
+}
+
+nav ul {
+    width: 100%;        /* KLUCZOWE: Lista rozciąga się na 100% szerokości */
+    display: flex;
+    align-items: center;
+    gap: 20px;          /* Odstępy między linkami (np. Cennik) */
+    margin: 0;
+    padding: 0;
+}
+
+nav li {
+    display: flex;
+}
+
+/* --- MAGIA: WYPYCHANIE "ZALOGUJ" NA PRAWO --- */
+nav li:last-child {
+    margin-left: auto; /* Ostatni element listy leci na sam koniec w prawo */
+}
+
+/* STYLE LINKÓW */
+nav a {
+    color: #cbd5e1;
+    font-weight: 500;
+    font-size: 14px;
+    transition: color 0.3s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+nav a:hover, nav a.router-link-active {
+    color: #dc2626; /* Czerwony akcent przy najechaniu */
+}
+
+
+
+/* =========================================
+   5. KARTY FILMÓW (REPERTUAR)
+   ========================================= */
 .movie {
     display: flex;
-    align-items: center;
-    background-color: #fff;
-    padding: 10px;
-    margin-bottom: 10px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-}
-.movie img {
-    width: 100px;
-    height: 150px;
-    object-fit: cover;
-    margin-right: 20px;
-    transition: transform 0.3s ease;
-}
-.movie img.zoomed { transform: scale(2.5); z-index: 10; position: relative; }
-.movie-details { flex: 1; }
-.movie-buttons button {
-    margin-right: 5px;
-    padding: 5px 10px;
-    cursor: pointer;
-    background-color: #efefef;
-    border: 1px solid #ccc;
-}
-.delete-btn {
-    background-color: #dc3545 !important;
-    color: white;
+    background-color: #1e293b; /* Slate 800 */
+    margin-bottom: 20px;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    border: 1px solid #334155;
+    transition: transform 0.2s;
 }
 
-/* --- FORMULARZE (LOGIN/REGISTER) --- */
-.form-box {
-    max-width: 400px;
-    margin: 20px auto;
-    padding: 20px;
-    border: 1px solid #ccc;
-    background-color: #f9f9f9;
+.movie:hover {
+    transform: translateY(-2px); /* Lekkie uniesienie */
+    border-color: #475569;
 }
-input[type="text"], input[type="email"], input[type="password"], textarea {
-    width: 100%;
-    padding: 10px;
-    margin-bottom: 10px;
-    border: 1px solid #ccc;
-    box-sizing: border-box;
+
+.movie img {
+    width: 120px;
+    height: 180px;
+    object-fit: cover;
+    border-radius: 8px;
+    margin-right: 20px;
 }
-input[type="submit"], button.action-btn {
-    width: 100%;
-    padding: 10px;
-    background-color: #28a745;
+
+.movie-details h3 {
+    margin-top: 0;
+    color: #fbbf24; /* Złoty tytuł (Amber 400) */
+}
+
+/* =========================================
+   6. PRZYCISKI GLOBALNE
+   ========================================= */
+button {
+    background: linear-gradient(to right, #dc2626, #b91c1c); /* Czerwony gradient */
     color: white;
     border: none;
+    padding: 10px 15px;
+    border-radius: 6px;
     cursor: pointer;
+    font-weight: 600;
+    transition: opacity 0.2s;
 }
-input[type="submit"]:hover, button.action-btn:hover { background-color: #218838; }
 
-/* --- CENNIK --- */
-.pricing-table {
-    width: 100%;
-    max-width: 600px;
-    margin: 20px auto;
-    border-collapse: collapse;
+button:hover {
+    opacity: 0.9;
 }
-.pricing-table th, .pricing-table td {
-    border: 1px solid #ccc;
+
+/* Specjalny styl dla przycisku usuwania (Admin) */
+button.delete-btn {
+    background: #475569; /* Szary */
+}
+
+button.delete-btn:hover {
+    background: #334155;
+}
+
+/* =========================================
+   7. FORMULARZE (FILTRY, INPUTY)
+   ========================================= */
+input, select {
     padding: 10px;
-    text-align: center;
-}
-.pricing-table th { background-color: #007BFF; color: white; }
-.pricing-table td { background-color: #f9f9f9; }
-.special-offer { background-color: #f4d03f; }
-
-/* --- REZERWACJA (FOTELE) --- */
-.seats-container {
-    display: grid;
-    grid-template-columns: repeat(10, auto);
-    justify-content: center;
-    gap: 5px;
-    margin: 20px 0;
-}
-.seat {
-    width: 40px; height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 5px;
-    font-size: 12px;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    background-color: #0f172a;
     color: white;
-    font-weight: bold;
-    cursor: pointer;
-    background-color: #2ecc71;
 }
-.seat.occupied { background-color: #c0392b; cursor: not-allowed; }
-.seat.selected { background-color: #f1c40f; color: black; border: 2px solid #333; }
 
+input:focus, select:focus {
+    outline: none;
+    border-color: #dc2626;
+}
 
-/* Modal Trailer */
+/* =========================================
+   8. FOOTER (STOPKA)
+   ========================================= */
+footer {
+    background-color: #0f172a;
+    color: #94a3b8;
+    text-align: center;
+    padding: 20px;
+    margin-top: auto;
+    border-top: 1px solid #1e293b;
+}
+
+/* =========================================
+   9. MODAL (TRAILER YOUTUBE)
+   ========================================= */
 .modal-overlay {
     display: flex;
     position: fixed;
     z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.9); 
-    justify-content: center;
-    align-items: center;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    justify-content: center; align-items: center;
     animation: fadeIn 0.3s;
 }
 
 .modal-content {
     position: relative;
-    
-    width: 90%; 
-    max-width: 800px; 
+    width: 90%; max-width: 800px;
     background: #000;
-    padding: 0; 
+    padding: 0;
     border-radius: 8px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.7);
-    overflow: hidden; 
+    overflow: hidden;
 }
 
 .close-button {
     position: absolute;
-    top: -40px; 
-    right: 0;
-    color: #fff;
-    font-size: 35px;
-    cursor: pointer;
-    font-weight: bold;
+    top: -40px; right: 0;
+    color: #fff; font-size: 35px;
+    cursor: pointer; font-weight: bold;
     z-index: 1001;
-    transition: color 0.2s;
 }
-.close-button:hover {
-    color: #dc3545; 
-}
-
 
 .video-container {
     position: relative;
-    padding-bottom: 56.25%; 
-    height: 0;
-    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+    height: 0; width: 100%;
     background-color: black;
+    overflow: hidden;
 }
-
 .video-container iframe {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border: none;
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%; border: none;
 }
 
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
 }
+
+/* =========================================
+   10. TOAST NOTIFICATION (DYMKI)
+   ========================================= */
+.toast-notification {
+  position: fixed; top: 20px; right: 20px;
+  padding: 15px 25px; border-radius: 8px;
+  color: white; font-weight: bold;
+  z-index: 9999;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+  animation: slideIn 0.5s ease-out;
+}
+.toast-notification.success { background-color: #16a34a; } /* Zielony */
+.toast-notification.error { background-color: #dc2626; }   /* Czerwony */
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+

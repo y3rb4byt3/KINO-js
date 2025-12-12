@@ -4,7 +4,6 @@ const User = require('../models/User');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken'); // Import biblioteki JWT
 
-// SEKRETNY KLUCZ (w produkcji powinien być w pliku .env)
 const JWT_SECRET = 'TWOJ_SUPER_TAJNY_KLUCZ_KINO_XYZ'; 
 
 // POST /users/register - Rejestracja nowego użytkownika

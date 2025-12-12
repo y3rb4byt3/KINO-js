@@ -11,7 +11,6 @@ const User = sequelize.define('User', {
         validate: { isEmail: true }
     },
     password: { type: DataTypes.STRING, allowNull: false },
-    // NOWE POLE: ROLA UŻYTKOWNIKA
     role: {
         type: DataTypes.STRING,
         allowNull: false,

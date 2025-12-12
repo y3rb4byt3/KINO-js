@@ -1,227 +1,214 @@
 <script setup>
-import { ref, onMounted, inject } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed, inject } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import CinemaButton from '../components/CinemaButton.vue'
+import CinemaHall from '../components/CinemaHall.vue' // <--- IMPORTUJEMY NOWY KOMPONENT
 
-const API_URL = 'http://localhost:3000/api'
+const route = useRoute()
 const router = useRouter()
-const notify = inject('notify') // <--- Wstrzykujemy nasze powiadomienia
+const notify = inject('notify')
+const API_URL = 'http://localhost:3000/api'
 
-// Pobieranie danych z localStorage
-const movieId = localStorage.getItem('selectedMovieId')
-const movieTitle = localStorage.getItem('selectedMovieTitle')
-const user = JSON.parse(localStorage.getItem('user'))
-
-// Zmienne stanu
+// Dane
+const movie = ref(null)
 const showtimes = ref([])
-const currentShowtime = ref(null)
-const selectedSeats = ref([])
-const rows = ['A','B','C','D','E','F','G','H','I','J']
+const selectedShowtime = ref(null)
+const selectedSeats = ref([]) 
 
-// Walidacja dostępu
-if (!user) {
-    // Ponieważ setup uruchamia się przed zamontowaniem, tu notify może nie zadziałać idealnie,
-    // ale router.push zadziała.
-    router.push('/login')
-}
-
-if (!movieId) {
-    router.push('/')
-}
-
-// 1. Pobieranie seansów
-const loadShowtimes = async () => {
-    try {
-        const res = await fetch(`${API_URL}/showtimes?movieId=${movieId}`)
-        showtimes.value = await res.json()
-    } catch (e) {
-        notify('Błąd pobierania seansów', 'error')
-    }
-}
-
-// 2. Wybór godziny
-const selectShowtime = (st) => {
-    currentShowtime.value = st
-    selectedSeats.value = [] // Resetujemy wybrane miejsca przy zmianie godziny
-}
-
-// 3. Sprawdzanie czy miejsce zajęte
-const isOccupied = (seat) => {
-    return currentShowtime.value.seatsLayout.occupiedSeats.includes(seat)
-}
-
-// 4. Klikanie w fotel
-const toggleSeat = (seat) => {
-    if (isOccupied(seat)) return // Nie można wybrać zajętego
-
-    if (selectedSeats.value.includes(seat)) {
-        // Jeśli już wybrany -> odznacz
-        selectedSeats.value = selectedSeats.value.filter(s => s !== seat)
-    } else {
-        // Jeśli wolny -> zaznacz
-        selectedSeats.value.push(seat)
-    }
-}
-
-// 5. Finalizacja (Wysyłka do backendu)
-const submitReservation = async () => {
-    if (selectedSeats.value.length === 0) return
-
-    const payload = {
-        userId: user.id,
-        showtimeId: currentShowtime.value.id,
-        seats: selectedSeats.value
-    }
-
-    try {
-        const res = await fetch(`${API_URL}/reservations`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-
-        if (res.ok) {
-            // SUKCES: Używamy notify zamiast alert
-            notify('Miejsce zarezerwowane! Dziękujemy.', 'success')
-            router.push('/')
-        } else {
-            // BŁĄD BACKENDU:
-            const err = await res.json()
-            notify('Błąd rezerwacji: ' + (err.error || 'Nieznany błąd'), 'error')
-        }
-    } catch (e) {
-        notify('Błąd połączenia z serwerem', 'error')
-    }
-}
-
-onMounted(() => {
-    if (user && movieId) {
-        loadShowtimes()
-    } else if (!user) {
-        notify('Musisz być zalogowany, aby kupić bilet.', 'error')
-    }
+onMounted(async () => {
+  const movieId = route.params.movieId
+  await fetchMovieDetails(movieId)
+  await fetchShowtimes(movieId)
 })
+
+const fetchMovieDetails = async (id) => {
+  try {
+    const res = await fetch(`${API_URL}/movies/${id}`)
+    if (res.ok) movie.value = await res.json()
+  } catch (e) { console.error(e) }
+}
+
+const fetchShowtimes = async (id) => {
+  try {
+    const res = await fetch(`${API_URL}/showtimes?movieId=${id}`)
+    if (res.ok) {
+      showtimes.value = await res.json()
+      if (showtimes.value.length > 0) selectShowtime(showtimes.value[0])
+    }
+  } catch (e) { console.error(e) }
+}
+
+const selectShowtime = (showtime) => {
+  selectedShowtime.value = showtime
+  selectedSeats.value = []
+}
+
+// Logika klikania w miejsce (uproszczona, bo CinemaHall daje nam gotowy obiekt seat)
+const handleToggleSeat = (seat) => {
+  if (seat.status === 'occupied') return
+
+  if (selectedSeats.value.includes(seat.id)) {
+    selectedSeats.value = selectedSeats.value.filter(id => id !== seat.id)
+  } else {
+    selectedSeats.value.push(seat.id)
+  }
+}
+
+const totalPrice = computed(() => {
+  if (!selectedShowtime.value) return 0
+  return selectedSeats.value.length * selectedShowtime.value.price
+})
+
+const submitReservation = async () => {
+  const userStr = localStorage.getItem('user')
+  if (!userStr) {
+    notify('Musisz być zalogowany, aby zarezerwować!', 'error')
+    router.push('/login')
+    return
+  }
+  
+  const user = JSON.parse(userStr)
+
+  try {
+    const response = await fetch(`${API_URL}/reservations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: user.id,
+        showtimeId: selectedShowtime.value.id,
+        seats: selectedSeats.value
+      })
+    })
+
+    const data = await response.json()
+    if (!response.ok) throw new Error(data.error || 'Błąd rezerwacji')
+
+    notify('Rezerwacja udana! Miłego seansu.', 'success')
+    router.push('/')
+
+  } catch (error) {
+    notify(error.message, 'error')
+  }
+}
 </script>
 
 <template>
-  <div class="container">
-    <div class="sidebar"></div>
-    <main>
-        <h2>Rezerwacja filmu: {{ movieTitle }}</h2>
+  <div class="reservation-page">
+    <div class="container" v-if="movie">
+      
+      <div class="movie-sidebar">
+        <img :src="movie.posterUrl || 'https://via.placeholder.com/300x450'" class="poster">
         
-        <div v-if="!currentShowtime">
-            <h3>Wybierz seans:</h3>
-            
-            <p v-if="showtimes.length === 0">Brak zaplanowanych seansów dla tego filmu.</p>
-            
-            <div class="showtimes-list">
-                <button 
-                    v-for="st in showtimes" 
-                    :key="st.id" 
-                    @click="selectShowtime(st)"
-                    class="time-btn"
-                >
-                    {{ st.date }} | <strong>{{ st.time }}</strong> ({{ st.price }} PLN)
-                </button>
+        <div class="sidebar-content">
+          <h1>{{ movie.title }}</h1>
+          <p class="genre">{{ Array.isArray(movie.genre) ? movie.genre.join(', ') : movie.genre }}</p>
+          
+          <div class="info-grid">
+             <div class="info-item">
+               <span class="label">Czas:</span>
+               <span class="value">{{ movie.duration }} min</span>
+             </div>
+             <div class="info-item">
+               <span class="label">Reżyser:</span>
+               <span class="value">{{ movie.director }}</span>
+             </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="booking-area">
+        
+        <h3>Wybierz seans:</h3>
+        <div class="showtimes-list">
+          <button 
+            v-for="st in showtimes" 
+            :key="st.id"
+            :class="['time-btn', { active: selectedShowtime?.id === st.id }]"
+            @click="selectShowtime(st)"
+          >
+            <span class="time">{{ st.time }}</span>
+            <span class="price-tag">{{ st.price }} zł</span>
+          </button>
+          <p v-if="showtimes.length === 0">Brak seansów dla tego filmu.</p>
+        </div>
+
+        <div v-if="selectedShowtime" class="hall-wrapper">
+          <CinemaHall 
+            :layout="selectedShowtime.seatsLayout"
+            :selectedSeats="selectedSeats"
+            @toggle-seat="handleToggleSeat"
+          />
+
+          <div class="summary-box">
+            <div class="summary-info">
+              <p>Miejsca: <span class="highlight">{{ selectedSeats.join(', ') || 'Brak' }}</span></p>
+              <p>Razem: <span class="highlight total">{{ totalPrice }} PLN</span></p>
             </div>
+            <div style="width: 200px">
+              <CinemaButton 
+                @click="submitReservation" 
+                :disabled="selectedSeats.length === 0"
+              >
+                Rezerwuj
+              </CinemaButton>
+            </div>
+          </div>
         </div>
 
-        <div v-else>
-             <button @click="currentShowtime = null" class="back-btn">&larr; Zmień godzinę</button>
-             
-             <div class="screen">EKRAN</div>
-
-             <div class="seats-container">
-                 <template v-for="row in rows" :key="row">
-                     <div 
-                        v-for="n in 10" 
-                        :key="row + n" 
-                        class="seat"
-                        :class="{
-                            'occupied': isOccupied(row + n), 
-                            'selected': selectedSeats.includes(row + n)
-                        }"
-                        @click="toggleSeat(row + n)"
-                     >
-                          {{ row + n }}
-                     </div>
-                 </template>
-             </div>
-
-             <div class="summary-box">
-                 <p v-if="selectedSeats.length > 0">
-                    Wybrane miejsca: <strong>{{ selectedSeats.join(', ') }}</strong><br>
-                    Do zapłaty: <strong>{{ selectedSeats.length * currentShowtime.price }} PLN</strong>
-                 </p>
-                 <p v-else>Wybierz miejsca na mapie sali.</p>
-
-                 <button 
-                    @click="submitReservation" 
-                    class="action-btn buy-btn"
-                    :disabled="selectedSeats.length === 0"
-                 >
-                    Kup i zapłać
-                 </button>
-             </div>
-        </div>
-    </main>
-    <div class="sidebar"></div>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-/* Lokalne style specyficzne tylko dla tego widoku */
+.reservation-page { min-height: 100vh; padding: 40px 20px; color: white; }
 
+.container {
+  max-width: 1200px; margin: 0 auto;
+  display: grid; grid-template-columns: 320px 1fr; gap: 50px;
+}
+
+/* Sidebar */
+.movie-sidebar {
+  background: #1e293b; border-radius: 16px; overflow: hidden;
+  border: 1px solid #334155; position: sticky; top: 20px; height: fit-content;
+}
+.poster { width: 100%; display: block; }
+.sidebar-content { padding: 25px; }
+.movie-sidebar h1 { font-size: 22px; margin: 0 0 10px 0; color: #fbbf24; line-height: 1.3; }
+.movie-sidebar .genre { color: #94a3b8; margin-bottom: 20px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+.info-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.info-item:last-child { border: none; }
+.info-item .label { color: #64748b; }
+.info-item .value { color: #e2e8f0; font-weight: 500; }
+
+/* Seanse */
+.showtimes-list { display: flex; gap: 12px; margin-bottom: 40px; flex-wrap: wrap; }
 .time-btn {
-    margin: 5px;
-    padding: 15px 20px;
-    background-color: #007BFF;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: background 0.2s;
+  background: #0f172a; border: 1px solid #334155; color: white;
+  padding: 12px 24px; border-radius: 12px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  transition: all 0.2s; min-width: 100px;
 }
-.time-btn:hover {
-    background-color: #0056b3;
-}
+.time-btn.active { background: #dc2626; border-color: #dc2626; transform: translateY(-2px); box-shadow: 0 10px 20px rgba(220, 38, 38, 0.2); }
+.time-btn:hover:not(.active) { background: #334155; border-color: #475569; }
+.time { font-size: 18px; font-weight: bold; }
+.price-tag { font-size: 13px; color: #94a3b8; }
+.time-btn.active .price-tag { color: rgba(255,255,255,0.8); }
 
-.back-btn {
-    margin-bottom: 20px;
-    padding: 5px 10px;
-    cursor: pointer;
-    background: transparent;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-}
-
-.screen {
-    background-color: #333;
-    color: #fff;
-    text-align: center;
-    padding: 5px;
-    margin: 0 auto 20px auto;
-    width: 80%;
-    border-radius: 0 0 20px 20px;
-    letter-spacing: 5px;
-    font-size: 12px;
-}
-
+/* Podsumowanie */
 .summary-box {
-    text-align: center;
-    margin-top: 30px;
-    padding: 20px;
-    background-color: #f9f9f9;
-    border-top: 1px solid #eee;
+  margin-top: 30px; padding: 25px; background: #1e293b; border-radius: 16px; border: 1px solid #334155;
+  display: flex; justify-content: space-between; align-items: center;
 }
+.summary-info p { margin: 5px 0; color: #94a3b8; }
+.highlight { color: white; font-weight: bold; }
+.highlight.total { color: #fbbf24; font-size: 24px; margin-left: 10px; }
 
-.buy-btn {
-    font-size: 18px;
-    padding: 12px 30px;
-    margin-top: 10px;
-}
-.buy-btn:disabled {
-    background-color: #ccc;
-    cursor: not-allowed;
+@media (max-width: 900px) {
+  .container { grid-template-columns: 1fr; }
+  .movie-sidebar { position: static; display: flex; align-items: center; }
+  .poster { width: 150px; height: 225px; object-fit: cover; }
+  .sidebar-content { flex: 1; }
 }
 </style>
