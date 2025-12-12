@@ -1,27 +1,9 @@
 const sequelize = require('./config/database');
 const Movie = require('./models/Movie');
 const User = require('./models/User');
-const Showtime = require('./models/Showtime');
 const Reservation = require('./models/Reservation');
-
-// --- DANE DO WPISANIA DO BAZY ---
-
-const usersData = [
-    {
-        firstName: "Szef",
-        lastName: "Admin",
-        email: "admin@kino.pl",
-        password: "admin", // Hasło admina
-        role: "admin"      
-    },
-    {
-        firstName: "Jan",
-        lastName: "Kowalski",
-        email: "test@example.com",
-        password: "password123",
-        role: "user"
-    }
-];
+const Showtime = require('./models/Showtime');
+const bcrypt = require('bcrypt'); // <--- WAŻNY IMPORT
 
 const moviesData = [
     {
@@ -32,7 +14,7 @@ const moviesData = [
         director: "Denis Villeneuve",
         posterUrl: "https://image.tmdb.org/t/p/w500/8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg",
         releaseDate: "2024-03-01",
-        trailerUrl: "https://www.youtube.com/watch?v=Way9Dexny3w" // <--- NOWE
+        trailerUrl: "https://www.youtube.com/watch?v=Way9Dexny3w"
     },
     {
         title: "Oppenheimer",
@@ -42,7 +24,7 @@ const moviesData = [
         director: "Christopher Nolan",
         posterUrl: "https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg",
         releaseDate: "2023-07-21",
-        trailerUrl: "https://www.youtube.com/watch?v=uYPbbksJxIg" // <--- NOWE
+        trailerUrl: "https://www.youtube.com/watch?v=uYPbbksJxIg"
     },
     {
         title: "The Batman",
@@ -52,7 +34,7 @@ const moviesData = [
         director: "Matt Reeves",
         posterUrl: "https://image.tmdb.org/t/p/w500/74xTEgt7R36Fpooo50r9T25onhq.jpg",
         releaseDate: "2022-03-04",
-        trailerUrl: "https://www.youtube.com/watch?v=mqqft2x_Aa4" // <--- NOWE
+        trailerUrl: "https://www.youtube.com/watch?v=mqqft2x_Aa4"
     },
     {
         title: "Barbie",
@@ -62,7 +44,7 @@ const moviesData = [
         director: "Greta Gerwig",
         posterUrl: "https://image.tmdb.org/t/p/w500/iuFNMS8U5cb6xfzi51Dbkovj7vM.jpg",
         releaseDate: "2023-07-21",
-        trailerUrl: "https://www.youtube.com/watch?v=pBk4NYhWNMM" // <--- NOWE
+        trailerUrl: "https://www.youtube.com/watch?v=pBk4NYhWNMM"
     },
     {
         title: "Killers of the Flower Moon",
@@ -72,55 +54,57 @@ const moviesData = [
         director: "Martin Scorsese",
         posterUrl: "https://image.tmdb.org/t/p/w500/dB6Krk806zeqd0YNp2ngQ9zXteH.jpg",
         releaseDate: "2023-10-20",
-        trailerUrl: "https://www.youtube.com/watch?v=EP34Yoxs3FQ" // <--- NOWE
+        trailerUrl: "https://www.youtube.com/watch?v=EP34Yoxs3FQ"
     }
 ];
 
-// Przykładowe seanse (zakładamy, że filmy dostaną ID 1-5)
-const showtimesData = [
-    { movieId: 1, date: "2026-06-01", time: "14:00", price: 25 },
-    { movieId: 1, date: "2026-06-01", time: "18:00", price: 30 },
-    { movieId: 2, date: "2026-06-01", time: "20:00", price: 35 },
-    { movieId: 3, date: "2026-06-02", time: "17:30", price: 28 },
-    { movieId: 4, date: "2026-06-02", time: "15:00", price: 25 }
-];
-
-// --- GŁÓWNA FUNKCJA ---
-
-async function seedDatabase() {
+const seedDatabase = async () => {
     try {
-        // 1. Łączymy się i RESETUJEMY bazę (force: true usuwa tabele i tworzy nowe z kolumną ROLE)
-        await sequelize.authenticate();
-        console.log('🔌 Połączono z bazą SQLite.');
-        
         await sequelize.sync({ force: true });
-        console.log('🧹 Wyczyszczono stare dane i zaktualizowano strukturę tabel.');
+        console.log('Baza danych została wyczyszczona.');
 
-        // 2. Dodajemy Użytkowników (w tym Admina)
-        for (const user of usersData) {
-            await User.create(user);
-        }
-        console.log('👤 Dodano użytkowników (w tym Admina).');
+        // 1. Tworzenie filmów
+        const createdMovies = await Movie.bulkCreate(moviesData);
+        console.log('Dodano filmy.');
 
-        // 3. Dodajemy Filmy
-        for (const movie of moviesData) {
-            await Movie.create(movie);
-        }
-        console.log('🎬 Dodano filmy.');
+        // 2. Szyfrowanie hasła Admina <--- TU JEST KLUCZ DO NAPRAWY
+        const hashedPassword = await bcrypt.hash('admin', 10);
 
-        // 4. Dodajemy Seanse
-        for (const showtime of showtimesData) {
-            await Showtime.create(showtime);
+        // 3. Tworzenie Admina
+        const adminUser = await User.create({
+            firstName: "Admin",
+            lastName: "System",
+            email: "admin@kino.pl",
+            password: hashedPassword, // Zapisujemy zaszyfrowane hasło!
+            role: "admin"
+        });
+        console.log('Dodano konto administratora (admin@kino.pl / admin).');
+
+        // 4. Generowanie seansów (dla każdego filmu po 2 seanse)
+        for (const movie of createdMovies) {
+            await Showtime.create({
+                movieId: movie.id,
+                date: "2024-06-01",
+                time: "14:00",
+                price: 25.00,
+                seatsLayout: { totalSeats: 100, occupiedSeats: [] }
+            });
+            await Showtime.create({
+                movieId: movie.id,
+                date: "2024-06-01",
+                time: "18:00",
+                price: 30.00,
+                seatsLayout: { totalSeats: 100, occupiedSeats: ['A1', 'A2'] } // Przykładowo zajęte
+            });
         }
-        console.log('📅 Dodano seanse.');
+        console.log('Dodano przykładowe seanse.');
 
         console.log('✅ SUKCES! Baza jest gotowa do pracy.');
-        process.exit();
-
     } catch (error) {
-        console.error('❌ Błąd krytyczny:', error);
-        process.exit(1);
+        console.error('Błąd seedowania bazy:', error);
+    } finally {
+        await sequelize.close();
     }
-}
+};
 
 seedDatabase();
