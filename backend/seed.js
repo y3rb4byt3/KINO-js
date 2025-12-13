@@ -88,7 +88,6 @@ const seedDatabase = async () => {
                 date: "2024-06-01",
                 time: "14:00",
                 price: 25.00,
-                // 👇 TU BYŁ BŁĄD. Dodajemy rows i seatsPerRow:
                 seatsLayout: { 
                     rows: 10, 
                     seatsPerRow: 10, 
