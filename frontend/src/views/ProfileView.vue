@@ -1,8 +1,9 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, inject } from 'vue' // 1. Dodajemy inject
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+const notify = inject('notify') // 2. Pobieramy system powiadomień z App.vue
 const API_URL = 'http://localhost:3000/api'
 
 const user = ref(null)
@@ -14,23 +15,34 @@ const handleLogout = () => {
   localStorage.removeItem('token')
   localStorage.removeItem('user')
   window.dispatchEvent(new Event('logout-success')) 
+  
+  if (notify) notify('Wylogowano pomyślnie.', 'success')
   router.push('/login')
 }
 
 const cancelReservation = async (reservationId) => {
-  if(!confirm('Czy na pewno chcesz anulować tę rezerwację?')) return
+  // Zostawiamy confirm jako zabezpieczenie przed przypadkowym kliknięciem
+
   try {
     const token = localStorage.getItem('token')
     const response = await fetch(`${API_URL}/reservations/${reservationId}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
     })
+
     if (response.ok) {
       reservations.value = reservations.value.filter(r => r.id !== reservationId)
+      // 3. Zamiast alertu -> notify sukces
+      if (notify) notify('Rezerwacja anulowana pomyślnie.', 'success')
     } else {
-      alert('Nie udało się anulować.')
+      // 4. Zamiast alertu -> notify błąd
+      const data = await response.json()
+      if (notify) notify(data.error || 'Nie udało się anulować.', 'error')
     }
-  } catch (err) { console.error(err) }
+  } catch (err) { 
+    console.error(err)
+    if (notify) notify('Błąd połączenia z serwerem.', 'error')
+  }
 }
 
 onMounted(async () => {
@@ -48,8 +60,20 @@ onMounted(async () => {
     const response = await fetch(`${API_URL}/reservations/my`, {
         headers: { 'Authorization': `Bearer ${token}` }
     })
-    if (response.ok) reservations.value = await response.json()
-  } catch (err) { console.error(err) } 
+    
+    // Obsługa wygaśnięcia tokena
+    if (response.status === 401 || response.status === 403) {
+        handleLogout()
+        return
+    }
+
+    if (response.ok) {
+        reservations.value = await response.json()
+    }
+  } catch (err) { 
+    console.error(err)
+    if (notify) notify('Problem z pobraniem biletów.', 'error')
+  } 
   finally { loading.value = false }
 })
 </script>
@@ -87,12 +111,12 @@ onMounted(async () => {
                     </div>
                     
                     <div class="ticket-info-area">
-                        <h4>{{ res.movie?.title }}</h4>
+                        <h4>{{ res.movie?.title || 'Film niedostępny' }}</h4>
                         <div class="ticket-meta">
                             <span>📅 {{ res.showtime?.date }}</span>
                             <span>🕒 {{ res.showtime?.time }}</span>
                         </div>
-                        <p class="ticket-seats">Miejsca: <strong>{{ res.seats.join(', ') }}</strong></p>
+                        <p class="ticket-seats">Miejsca: <strong>{{ Array.isArray(res.seats) ? res.seats.join(', ') : res.seats }}</strong></p>
                     </div>
 
                     <div class="ticket-actions-area">

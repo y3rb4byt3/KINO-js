@@ -38,7 +38,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// GET - Pobierz film wraz z jego seansami (dla kompatybilności ze starym API)
+// GET - Pobierz film wraz z jego seansami 
 router.get('/movie/:movieId', async (req, res) => {
   try {
     const movieId = req.params.movieId;

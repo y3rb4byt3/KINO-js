@@ -1,15 +1,17 @@
 <script setup>
-import { ref, onMounted, provide } from 'vue'
+import { ref, onMounted, provide, onUnmounted } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 
 const router = useRouter()
 const user = ref(null)
 
-// --- SYSTEM POWIADOMIEŃ ---
+// --- SYSTEM POWIADOMIEŃ (TOAST) ---
 const notification = ref({ message: '', type: '', visible: false })
 
 const notify = (message, type = 'success') => {
   notification.value = { message, type, visible: true }
+  
+  // Automatyczne ukrywanie po 3 sekundach
   setTimeout(() => {
     notification.value.visible = false
   }, 3000)
@@ -20,7 +22,9 @@ provide('notify', notify)
 // --- OBSŁUGA UŻYTKOWNIKA ---
 const checkUser = () => {
   const storedUser = localStorage.getItem('user')
-  if (storedUser) {
+  const token = localStorage.getItem('token')
+  
+  if (storedUser && token) {
     try {
       user.value = JSON.parse(storedUser)
     } catch (e) { user.value = null }
@@ -40,39 +44,31 @@ const logout = () => {
 onMounted(() => {
   checkUser()
   window.addEventListener('login-success', checkUser)
+  window.addEventListener('logout-success', checkUser)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('login-success', checkUser)
+  window.removeEventListener('logout-success', checkUser)
 })
 </script>
 
 <template>
   <div class="wrapper">
     <header>
-      <h1>
-        <RouterLink to="/" style="color: white; text-decoration: none;">kinoVERSE</RouterLink>
-      </h1>
-      
+      <h1><RouterLink to="/" class="logo">kinoVERSE</RouterLink></h1>
       <nav>
         <ul>
-          <li>
-            <RouterLink to="/pricing" class="nav-btn">Cennik</RouterLink>
+          <li><RouterLink to="/pricing" class="nav-btn">Cennik</RouterLink></li>
+          <li v-if="user" class="auth-panel">
+            <span class="welcome-text">Witaj, {{ user.firstName }}</span>
+            <RouterLink to="/profile" class="nav-btn">👤 Profil</RouterLink>
+            <button @click="logout" class="nav-btn logout">Wyloguj</button>
           </li>
-
-          <li v-if="user" class="user-panel">
-            <span class="welcome-text">Witaj, {{ user.firstName || 'Kinomaniaku' }}</span>
-
-            <RouterLink to="/profile" class="nav-btn">
-              👤 Profil
-            </RouterLink>
-
-            <button @click="logout" class="nav-btn">
-              Wyloguj
-            </button>
-          </li>
-          
-          <li v-else class="guest-panel">
+          <li v-else class="auth-panel">
              <RouterLink to="/login" class="nav-btn">Logowanie</RouterLink>
              <RouterLink to="/register" class="nav-btn">Rejestracja</RouterLink>
           </li>
-
         </ul>
       </nav>
     </header>
@@ -83,130 +79,136 @@ onMounted(() => {
       <p>&copy; 2025 kinoVERSE. Wszystkie prawa zastrzeżone.</p>
     </footer>
 
-    <div v-if="notification.visible" :class="['toast-notification', notification.type]">
-      {{ notification.message }}
-    </div>
+    <Transition name="toast-slide">
+      <div v-if="notification.visible" class="toast-wrapper">
+        <div :class="['toast-card', notification.type]">
+          
+          <div class="toast-icon">
+            <svg v-if="notification.type === 'success'" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+            
+            <svg v-else-if="notification.type === 'error'" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+            
+            <svg v-else xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          </div>
+
+          <p class="toast-message">{{ notification.message }}</p>
+        </div>
+      </div>
+    </Transition>
+
   </div>
 </template>
 
 <style>
-/* --- UNIWERSALNY STYL PRZYCISKÓW MENU --- */
-.nav-btn {
-  /* Wygląd podstawowy */
-  background-color: #1e293b; /* Ciemne tło (spójne z nagłówkiem) */
-  color: #cbd5e1;            /* Jasnoszary tekst */
-  border: 1px solid #475569; /* Delikatna ramka */
+/* --- STYLE OGÓLNE --- */
+body { margin: 0; background-color: #0f172a; font-family: 'Segoe UI', sans-serif; color: #cbd5e1; }
+.wrapper { display: flex; flex-direction: column; min-height: 100vh; }
+header { background: #1e293b; padding: 0 30px; display: flex; align-items: center; justify-content: space-between; height: 80px; border-bottom: 1px solid #334155; position: sticky; top: 0; z-index: 50; }
+.logo { color: white; text-decoration: none; font-weight: 800; font-size: 1.5rem; letter-spacing: 1px; }
+nav { flex: 1; margin-left: 40px; }
+nav ul { list-style: none; display: flex; gap: 15px; margin: 0; padding: 0; align-items: center; }
+.auth-panel { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.welcome-text { color: #94a3b8; font-size: 0.9rem; margin-right: 10px; display: none; }
+@media (min-width: 768px) { .welcome-text { display: inline; } }
+.nav-btn { background-color: #0f172a; color: #cbd5e1; border: 1px solid #475569; padding: 8px 16px; border-radius: 6px; font-size: 0.9rem; font-weight: 600; text-decoration: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.nav-btn:hover { background-color: #334155; color: #fbbf24; border-color: #fbbf24; }
+.router-link-active.nav-btn { background-color: #334155; color: #fbbf24; border-color: #fbbf24; }
+.nav-btn.logout:hover { color: #ef4444; border-color: #ef4444; }
+#footer { margin-top: auto; background: #1e293b; color: #64748b; text-align: center; padding: 20px; border-top: 1px solid #334155; font-size: 0.8rem; }
+
+
+/* --- 🔥 STYLE TOAST (Przetłumaczone z Tailwind na CSS) --- */
+
+/* Wrapper: fixed bottom-8 left-1/2 -translate-x-1/2 z-50 */
+.toast-wrapper {
+  position: fixed;
+  bottom: 2rem; /* bottom-8 */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  pointer-events: none; /* Żeby wrapper nie blokował kliknięć obok */
+}
+
+/* Card: flex items-center gap-3 px-5 py-3 rounded-xl bg-slate-800/95 backdrop-blur-sm border-l-4 shadow-2xl min-w-[320px] */
+.toast-card {
+  display: flex;
+  align-items: center;
+  gap: 12px; /* gap-3 */
+  padding: 12px 20px; /* py-3 px-5 */
+  border-radius: 12px; /* rounded-xl */
   
-  /* Wymiary i font */
-  padding: 8px 16px;
-  border-radius: 8px;        /* Zaokrąglone rogi */
-  font-size: 0.95rem;
-  font-weight: 600;
-  text-decoration: none;     /* Usuwa podkreślenie linków */
-  cursor: pointer;
+  /* Kolor tła: slate-800 z opacity 95% */
+  background-color: rgba(30, 41, 59, 0.95);
   
-  /* Wyrównanie */
-  display: inline-flex;
+  /* Efekt rozmycia tła */
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  
+  /* Cień: shadow-2xl */
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  
+  /* Rozmiar */
+  min-width: 320px;
+  max-width: 450px;
+  
+  /* Ramka z lewej (border-l-4) - kolor definiujemy niżej */
+  border-left-width: 4px;
+  border-left-style: solid;
+  
+  pointer-events: auto; /* Karta ma reagować */
+}
+
+/* Ikona i tekst */
+.toast-icon {
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  
-  /* Płynna animacja */
-  transition: all 0.2s ease-in-out;
-  font-family: inherit;      /* Żeby button miał ten sam font co linki */
 }
-
-/* Efekt po najechaniu myszką (Hover) */
-.nav-btn:hover {
-  background-color: #334155; /* Nieco jaśniejsze tło */
-  color: #fbbf24;            /* Złoty tekst */
-  border-color: #fbbf24;     /* Złota ramka */
-  transform: translateY(-2px); /* Lekkie uniesienie */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-/* Aktywny link (np. gdy jesteś na stronie cennika) */
-.router-link-active.nav-btn {
-  background-color: #334155;
-  color: #fbbf24;
-  border-color: #fbbf24;
-}
-
-/* --- UKŁAD ELEMENTÓW --- */
-.user-panel, .guest-panel {
-  margin-left: auto; 
-  display: flex; 
-  align-items: center; 
-  gap: 12px;
-}
-
-.welcome-text {
-  color: #94a3b8;
-  font-size: 0.9rem;
-  margin-right: 5px;
-}
-
-/* Layout */
-.wrapper { display: flex; flex-direction: column; min-height: 100vh; }
-header { 
-  background: #0f172a; /* Bardzo ciemny granat */
-  padding: 0 30px; 
-  display: flex; 
-  align-items: center; 
-  justify-content: space-between; 
-  height: 80px; 
-  border-bottom: 1px solid #1e293b; 
-}
-nav ul { list-style: none; display: flex; gap: 15px; margin: 0; padding: 0; width: 100%; align-items: center; }
-nav { flex: 1; margin-left: 40px; }
-#footer { margin-top: auto; background: #0f172a; color: #475569; text-align: center; padding: 20px; border-top: 1px solid #1e293b; font-size: 0.8rem; }
-
-/* --- NOWY WYGLĄD POWIADOMIEŃ (DYMEK) --- */
-.toast-notification {
-  /* Pozycjonowanie na środku ekranu */
-  position: fixed;
-  top: 15%; /* 15% od góry - żeby nie zasłaniało najważniejszych treści, ale było widoczne */
-  left: 50%;
-  transform: translateX(-50%); /* Idealne wycentrowanie w poziomie */
-  
-  /* Wygląd dymka */
-  min-width: 300px;
-  max-width: 90%;
-  padding: 16px 30px;
-  border-radius: 50px; /* Mocno zaokrąglone rogi (kształt pastylki) */
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6); /* Mocny cień dla efektu "lewitacji" */
-  
-  /* Tekst */
+.toast-message {
   color: white;
-  font-weight: 600;
+  margin: 0;
   font-size: 1rem;
-  text-align: center;
-  z-index: 10000; /* Musi być na samym wierzchu */
-  
-  /* Animacja pojawiania się */
-  animation: slideDownFade 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  font-weight: 500;
+  flex: 1;
 }
 
-/* Kolory w zależności od typu */
-.toast-notification.success {
-  background: linear-gradient(135deg, #16a34a, #15803d); /* Zielony gradient */
-  border: 2px solid #22c55e;
+/* --- WARIANTY KOLORYSTYCZNE (Tailwind colors) --- */
+
+/* Success: border-emerald-500, text-emerald-500 */
+.toast-card.success {
+  border-left-color: #10b981;
+}
+.toast-card.success .toast-icon {
+  color: #10b981;
 }
 
-.toast-notification.error {
-  background: linear-gradient(135deg, #dc2626, #b91c1c); /* Czerwony gradient */
-  border: 2px solid #ef4444;
+/* Error: border-red-500, text-red-500 */
+.toast-card.error {
+  border-left-color: #ef4444;
+}
+.toast-card.error .toast-icon {
+  color: #ef4444;
 }
 
-/* Animacja - sprężyste pojawienie się */
-@keyframes slideDownFade {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -20px) scale(0.9); /* Startuje trochę wyżej i mniejszy */
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0) scale(1); /* Ląduje na miejscu */
-  }
+/* Info: border-amber-500, text-amber-500 */
+.toast-card.info {
+  border-left-color: #f59e0b;
+}
+.toast-card.info .toast-icon {
+  color: #f59e0b;
+}
+
+/* --- ANIMACJE (Vue Transition) --- */
+/* Odpowiednik: transition-all duration-300 ease-out */
+.toast-slide-enter-active,
+.toast-slide-leave-active {
+  transition: all 0.3s ease-out;
+}
+
+/* Stan początkowy/końcowy: opacity-0 translate-y-4 */
+.toast-slide-enter-from,
+.toast-slide-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 1rem); /* Przesunięcie w dół o 1rem */
 }
 </style>

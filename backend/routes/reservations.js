@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Reservation = require('../models/Reservation');
 const Showtime = require('../models/Showtime');
-const Movie = require('../models/Movie'); // Potrzebny, żeby wyświetlić tytuł filmu
+const Movie = require('../models/Movie');
 
 const { authenticateToken } = require('../middleware/authMiddleware');
 
@@ -11,49 +11,43 @@ const { authenticateToken } = require('../middleware/authMiddleware');
 // ==========================================
 router.post('/', authenticateToken, async (req, res) => {
     try {
-        // ID użytkownika bierzemy z tokena (dzięki middleware), a nie z body!
         const userId = req.user.id; 
-        const { showtimeId, seats } = req.body; // seats to tablica np. ['A1', 'A2']
+        const { showtimeId, seats } = req.body;
 
-        // Walidacja: czy wybrano miejsca
         if (!seats || !Array.isArray(seats) || seats.length === 0) {
             return res.status(400).json({ error: 'Musisz wybrać przynajmniej jedno miejsce.' });
         }
 
-        // A. Pobierz seans
         const showtime = await Showtime.findByPk(showtimeId);
         if (!showtime) {
             return res.status(404).json({ error: 'Wybrany seans nie istnieje.' });
         }
 
-        // B. Sprawdź dostępność miejsc
-        // Musimy obsłużyć sytuację, gdy seatsLayout jest JSON-em lub obiektem
+        // B. Sprawdź dostępność
         let currentLayout = showtime.seatsLayout;
         if (typeof currentLayout === 'string') {
             currentLayout = JSON.parse(currentLayout);
         }
-        // Jeśli nie ma pola occupiedSeats, to przyjmij pustą tablicę
+        
         const occupied = currentLayout.occupiedSeats || [];
 
-        // Sprawdź konflikt
         const isConflict = seats.some(seat => occupied.includes(seat));
         if (isConflict) {
             return res.status(409).json({ error: 'Jedno z wybranych miejsc zostało już zajęte.' });
         }
 
-        // C. Zaktualizuj zajęte miejsca w seansie
+        // C. Zaktualizuj zajęte miejsca w seansie (DODAJEMY)
         const newOccupiedSeats = [...occupied, ...seats];
         
-        // Zapisujemy zaktualizowany layout do bazy
-        // Zachowujemy rows i seatsPerRow, zmieniamy tylko occupiedSeats
         const updatedLayout = {
             ...currentLayout,
             occupiedSeats: newOccupiedSeats
         };
 
-        await showtime.update({
-            seatsLayout: updatedLayout
-        });
+        // Ważne dla Sequelize przy polach JSON - wymuszamy update
+        showtime.seatsLayout = updatedLayout;
+        showtime.changed('seatsLayout', true);
+        await showtime.save();
 
         // D. Utwórz rezerwację
         const reservation = await Reservation.create({
@@ -82,27 +76,20 @@ router.get('/my', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
 
-        // 1. Pobieramy "surowe" rezerwacje użytkownika
         const reservations = await Reservation.findAll({
             where: { userId: userId },
             order: [['createdAt', 'DESC']]
         });
-
       
         const fullReservations = await Promise.all(reservations.map(async (res) => {
-            // Zamieniamy obiekt Sequelize na zwykły obiekt JS
             const resData = res.toJSON();
-
-            // Szukamy seansu dla tej rezerwacji
             const showtime = await Showtime.findByPk(resData.showtimeId);
             
             let movie = null;
             if (showtime) {
-                // Szukamy filmu dla tego seansu
                 movie = await Movie.findByPk(showtime.movieId);
             }
 
-            // Doklejamy znalezione dane do wyniku
             return {
                 ...resData,
                 showtime: showtime ? showtime.toJSON() : null,
@@ -119,14 +106,14 @@ router.get('/my', authenticateToken, async (req, res) => {
 });
 
 // ==========================================
-// DELETE /:id - Anuluj rezerwację
+// DELETE /:id - Anuluj rezerwację (NAPRAWIONE)
 // ==========================================
 router.delete('/:id', authenticateToken, async (req, res) => {
     try {
         const reservationId = req.params.id;
-        const userId = req.user.id; // Z tokena
+        const userId = req.user.id;
 
-        // Szukamy rezerwacji, która należy do tego użytkownika
+        // 1. Znajdź rezerwację (żeby wiedzieć co usuwamy)
         const reservation = await Reservation.findOne({
             where: { id: reservationId, userId: userId }
         });
@@ -135,12 +122,35 @@ router.delete('/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Rezerwacja nie znaleziona lub brak uprawnień.' });
         }
 
-        // Usuwamy z bazy
+        // 2. Znajdź seans powiązany z tą rezerwacją
+        const showtime = await Showtime.findByPk(reservation.showtimeId);
+        
+        if (showtime) {
+            // 3. Pobierz aktualny układ sali
+            let layout = showtime.seatsLayout;
+            if (typeof layout === 'string') layout = JSON.parse(layout);
+
+            // 4. Pobierz miejsca do usunięcia (z rezerwacji)
+            let seatsToRemove = reservation.seats;
+            // Sequelize czasem zwraca JSON jako string, czasem jako obiekt
+            if (typeof seatsToRemove === 'string') seatsToRemove = JSON.parse(seatsToRemove);
+
+            // 5. Wykreśl te miejsca z listy occupiedSeats
+            // Zostawiamy tylko te miejsca, których NIE MA na liście do usunięcia
+            if (layout.occupiedSeats && Array.isArray(layout.occupiedSeats)) {
+                layout.occupiedSeats = layout.occupiedSeats.filter(seat => !seatsToRemove.includes(seat));
+            }
+
+            // 6. Zapisz zaktualizowany layout w seansie
+            showtime.seatsLayout = layout;
+            showtime.changed('seatsLayout', true); // Kluczowe dla Sequelize!
+            await showtime.save();
+        }
+
+        // 7. Dopiero teraz usuń samą rezerwację z historii
         await reservation.destroy();
 
-        
-
-        res.json({ message: 'Rezerwacja została anulowana.' });
+        res.json({ message: 'Rezerwacja anulowana, miejsca zwolnione.' });
 
     } catch (error) {
         console.error(error);
