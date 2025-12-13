@@ -1,31 +1,62 @@
 const express = require('express');
 const router = express.Router();
 const Movie = require('../models/Movie');
-const { Op } = require('sequelize'); // Operator do filtrowania (LIKE)
+const { Op } = require('sequelize'); // Operator do filtrowania (LIKE, OR)
 
-// GET - Pobierz filmy (READ)
+// ==========================================
+// GET / - Pobierz filmy (FILTROWANIE, SORTOWANIE, PAGINACJA)
+// ==========================================
 router.get('/', async (req, res) => {
-  try {
-    const { genre } = req.query;
-    let options = {};
+    try {
+        // 1. Pobieramy parametry z URL (z wartościami domyślnymi)
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 8; // Domyślnie 8 filmów na stronę
+        const search = req.query.search || ''; // Fraza wyszukiwania
+        const sortBy = req.query.sortBy || 'createdAt'; // Sortowanie po...
+        const order = req.query.order || 'DESC'; // Kierunek (ASC/DESC)
 
-    if (genre && genre !== 'all') {
-      // Użycie operatora LIKE do wyszukiwania gatunku w ciągu znaków (jak w SQLite)
-      options.where = {
-        genre: {
-          [Op.like]: `%${genre}%` 
+        // 2. Obliczamy offset (ile rekordów pominąć)
+        const offset = (page - 1) * limit;
+
+        // 3. Budujemy warunek WHERE
+        const whereCondition = {};
+
+        // Jeśli jest fraza wyszukiwania, szukamy w Tytule LUB Gatunku
+        if (search) {
+            whereCondition[Op.or] = [
+                { title: { [Op.like]: `%${search}%` } },
+                { genre: { [Op.like]: `%${search}%` } } // Zakładając, że genre to string lub JSON string
+            ];
         }
-      };
-    }
 
-    const movies = await Movie.findAll(options);
-    res.json(movies);
-  } catch (error) {
-    res.status(500).json({ error: 'Nie udało się pobrać filmów', message: error.message });
-  }
+        // 4. Pobieramy dane (findAndCountAll zwraca też całkowitą liczbę wyników)
+        const { count, rows } = await Movie.findAndCountAll({
+            where: whereCondition,
+            order: [[sortBy, order]], // np. [['title', 'ASC']]
+            limit: limit,
+            offset: offset
+        });
+
+        // 5. Zwracamy odpowiedź w formacie: { movies: [], pagination: {} }
+        res.json({
+            movies: rows,
+            pagination: {
+                totalItems: count,
+                totalPages: Math.ceil(count / limit),
+                currentPage: page,
+                itemsPerPage: limit
+            }
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Nie udało się pobrać filmów', message: error.message });
+    }
 });
 
+// ==========================================
 // GET /:id - Pobierz pojedynczy film
+// ==========================================
 router.get('/:id', async (req, res) => {
     try {
         const movie = await Movie.findByPk(req.params.id);
@@ -38,20 +69,21 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-
+// ==========================================
 // POST - Dodaj film (CREATE)
+// ==========================================
 router.post('/', async (req, res) => {
-  try {
-    // Movie.create automatycznie sprawdza walidację z modelu
-    const newMovie = await Movie.create(req.body);
-    res.status(201).json({ message: 'Film dodany', movie: newMovie });
-  } catch (error) {
-    // Obsługa błędów walidacji Sequelize
-    res.status(400).json({ error: 'Błąd walidacji', message: error.message });
-  }
+    try {
+        const newMovie = await Movie.create(req.body);
+        res.status(201).json({ message: 'Film dodany', movie: newMovie });
+    } catch (error) {
+        res.status(400).json({ error: 'Błąd walidacji', message: error.message });
+    }
 });
 
+// ==========================================
 // PUT /:id - Aktualizuj film (UPDATE)
+// ==========================================
 router.put('/:id', async (req, res) => {
     try {
         const [updatedRowsCount] = await Movie.update(req.body, {
@@ -59,21 +91,19 @@ router.put('/:id', async (req, res) => {
         });
 
         if (updatedRowsCount === 0) {
-            // Zwraca 404 jeśli film o danym ID nie został znaleziony
             return res.status(404).json({ error: 'Film o podanym ID nie istnieje.' });
         }
 
-        // Pobierz zaktualizowany film, aby go zwrócić
         const updatedMovie = await Movie.findByPk(req.params.id);
-
         res.json({ message: 'Film zaktualizowany pomyślnie', movie: updatedMovie });
     } catch (error) {
-        // Zwracanie błędu 400 w przypadku niepowodzenia walidacji danych
         res.status(400).json({ error: 'Błąd aktualizacji', message: error.message });
     }
 });
 
+// ==========================================
 // DELETE /:id - Usuń film (DELETE)
+// ==========================================
 router.delete('/:id', async (req, res) => {
     try {
         const deletedRowCount = await Movie.destroy({
@@ -84,12 +114,10 @@ router.delete('/:id', async (req, res) => {
             return res.status(404).json({ error: 'Film o podanym ID nie istnieje.' });
         }
 
-        // 200 OK z komunikatem, że film został usunięty
         res.status(200).json({ message: 'Film usunięty pomyślnie.' });
     } catch (error) {
         res.status(500).json({ error: 'Błąd serwera', message: error.message });
     }
 });
-
 
 module.exports = router;
