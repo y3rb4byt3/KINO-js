@@ -49,6 +49,67 @@ router.get('/all', authenticateToken, requireRole('admin'), async (req, res) => 
     }
 });
 
+
+router.post('/', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id; 
+        const { showtimeId, seats } = req.body;
+
+        if (!seats || !Array.isArray(seats) || seats.length === 0) {
+            return res.status(400).json({ error: 'Musisz wybrać przynajmniej jedno miejsce.' });
+        }
+
+        const showtime = await Showtime.findByPk(showtimeId);
+        if (!showtime) {
+            return res.status(404).json({ error: 'Wybrany seans nie istnieje.' });
+        }
+
+        // B. Sprawdź dostępność
+        let currentLayout = showtime.seatsLayout;
+        if (typeof currentLayout === 'string') {
+            currentLayout = JSON.parse(currentLayout);
+        }
+        
+        const occupied = currentLayout.occupiedSeats || [];
+
+        const isConflict = seats.some(seat => occupied.includes(seat));
+        if (isConflict) {
+            return res.status(409).json({ error: 'Jedno z wybranych miejsc zostało już zajęte.' });
+        }
+
+        // C. Zaktualizuj zajęte miejsca w seansie (DODAJEMY)
+        const newOccupiedSeats = [...occupied, ...seats];
+        
+        const updatedLayout = {
+            ...currentLayout,
+            occupiedSeats: newOccupiedSeats
+        };
+
+        // Ważne dla Sequelize przy polach JSON - wymuszamy update
+        showtime.seatsLayout = updatedLayout;
+        showtime.changed('seatsLayout', true);
+        await showtime.save();
+
+        // D. Utwórz rezerwację
+        const reservation = await Reservation.create({
+            userId: userId,
+            showtimeId: showtimeId,
+            seats: seats, 
+            totalPrice: showtime.price * seats.length,
+            status: 'confirmed'
+        });
+
+        res.status(201).json({
+            message: 'Rezerwacja udana!',
+            reservation
+        });
+
+    } catch (error) {
+        console.error('Błąd rezerwacji:', error);
+        res.status(500).json({ error: 'Wystąpił błąd serwera.' });
+    }
+});
+
 // ==========================================
 // GET /my - Pobierz moje rezerwacje
 // ==========================================
