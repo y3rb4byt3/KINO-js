@@ -15,7 +15,7 @@ function authenticateToken(req, res, next) {
     });
 }
 
-// Implementacja ze slajdu 28 
+// Middleware do sprawdzania roli użytkownika
 function requireRole(role) {
     return (req, res, next) => {
         // Najpierw musi zadziałać authenticateToken, żeby req.user istniał
