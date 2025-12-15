@@ -60,6 +60,9 @@ onUnmounted(() => {
       <nav>
         <ul>
           <li><RouterLink to="/pricing" class="nav-btn">Cennik</RouterLink></li>
+          <li v-if="user && user.role === 'admin'">
+          <RouterLink to="/admin" class="nav-btn">🛡️ Admin Panel</RouterLink>
+          </li>
           <li v-if="user" class="auth-panel">
             <span class="welcome-text">Witaj, {{ user.firstName }}</span>
             <RouterLink to="/profile" class="nav-btn">👤 Profil</RouterLink>
